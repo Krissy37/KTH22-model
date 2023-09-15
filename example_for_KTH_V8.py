@@ -8,7 +8,7 @@ Created on Wed May 17 15:37:25 2023
 
 import sys
 import numpy as np
-sys.path.append('C:\\Users\\Kristin\\Documents\\PhD\\KTH_V8_ext_user') # adapt this local path! 
+sys.path.append('C:\\Users\\Kristin\\Documents\\PhD\\KTH_V8_ext_user\\KTH22-model-main\\KTH22-model-main\\') # adapt this local path!
 import kth22_model_for_mercury_v8 as kth
 control_param_path = 'control_params_v8b.json'
 fit_param_path = 'kth_own_cf_fit_parameters_opt_total_March23.dat'
@@ -34,12 +34,12 @@ fit_param_path = 'kth_own_cf_fit_parameters_opt_total_March23.dat'
 R_M = 2440
 
 #define coordinates in mso
-x_mso = np.linspace(-1.0, -2.0, 10)*R_M
-y_mso = np.linspace(-0.800, -1.0, 10)*R_M
-z_mso = np.linspace(-0.2, 0.2, 10)*R_M
+x_mso = np.linspace(-1.0, -2.0, 5)*R_M
+y_mso = np.linspace(-0.800, -1.0, 5)*R_M
+z_mso = np.linspace(-0.2, 0.2, 5)*R_M
 
 #define heliocentric distance and disturbance index per data point
-r_hel = np.ones(len(x_mso))* 0.39
+r_hel = np.ones(len(x_mso))* 0.38
 di = np.ones(len(x_mso))*50
 
 
@@ -55,13 +55,26 @@ By_KTH = B_KTH[1]
 Bz_KTH = B_KTH[2]
 
 #print input coordinates
-print('x (MSO): ', x_mso)
-print('y (MSO): ', y_mso)
-print('z (MSO): ', z_mso)
+print('x (in MSO in km): ', x_mso)
+print('y (in MSO in km): ', y_mso)
+print('z (in MSO in km): ', z_mso)
 print('\n')
 
 #print magnetic field output
-print('Bx KTH:', Bx_KTH)
-print('By KTH:', By_KTH)
-print('Bz KTH:', Bz_KTH)
+print('Bx KTH in nT:', Bx_KTH)
+print('By KTH in nT:', By_KTH)
+print('Bz KTH in nT:', Bz_KTH)
+
+# =============================================================================
+# if the model works correctly it should print: 
+    
+#    x (in MSO in km):  [-2440. -3050. -3660. -4270. -4880.]
+#    y (in MSO in km):  [-1952. -2074. -2196. -2318. -2440.]
+#    z (in MSO in km):  [-488. -244.    0.  244.  488.]
+
+
+#    Bx KTH in nT: [-64.80098033 -34.98386671 -18.89468403  -8.64362799   0.5510961 ]
+#    By KTH in nT: [-44.7549646  -18.09132029  -6.53956869  -1.78764539   0.14927192]
+#    Bz KTH in nT: [73.97436867 54.50286861 35.30068583 22.80420477 17.81541054]
+# =============================================================================
 
