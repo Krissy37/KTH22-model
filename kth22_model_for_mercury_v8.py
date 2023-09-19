@@ -938,10 +938,11 @@ def trace_fieldline_v7b(x_start, y_start, z_start, r_hel, di, control_param_path
 
     while r > 1 and i < 4000:
         
-
-        print('i = ', i)
+        if i%10 == 0: 
+            print('i = ', i)
+            
         r = np.sqrt((x_trace[i] / R_M) ** 2 + (y_trace[i] / R_M) ** 2 + (z_trace[i] / R_M) ** 2)
-        if r < 1.001:
+        if r < 1.05:
             #print('r < 1RM')
             break
         '''
@@ -952,21 +953,36 @@ def trace_fieldline_v7b(x_start, y_start, z_start, r_hel, di, control_param_path
         if i > 1 and (z_trace[1] < z_start):    #fieldline starts southward
             if z_trace[i] > 479:                 # stop if fieldline crosses mag. equator
                 break
-        '''    
+        '''  
+        
+        
         B = f(x_trace[i], y_trace[i], z_trace[i])
+        if np.isnan(B[0]) == True: 
+            break
         
 
         k1 = delta_t * B
-
-        k2 = delta_t * f(x_trace[i] + 0.5 * k1[0], y_trace[i] + 0.5 * k1[1], z_trace[i] + 0.5 + k1[2])
-
-        k3 = delta_t * f(x_trace[i] + 0.5 * k2[0], y_trace[i] + 0.5 * k2[1], z_trace[i] + 0.5 * k2[2])
-
-        k4 = delta_t * f(x_trace[i] + k3[0], y_trace[i] + k3[1], z_trace[i] + k3[2])
-
+        try: 
+            k2 = delta_t * f(x_trace[i] + 0.5 * k1[0], y_trace[i] + 0.5 * k1[1], z_trace[i] + 0.5 + k1[2])
+        except: break
+        
+        try:
+            k3 = delta_t * f(x_trace[i] + 0.5 * k2[0], y_trace[i] + 0.5 * k2[1], z_trace[i] + 0.5 * k2[2])
+        except: break
+        try: 
+            k4 = delta_t * f(x_trace[i] + k3[0], y_trace[i] + k3[1], z_trace[i] + k3[2])
+        except: 
+            break
+        
+        if np.isnan(x_trace[i])== True: 
+            break
+        
         x_trace.append(x_trace[i] + (1 / 6) * (k1[0] + 2 * k2[0] + 3 * k3[0] + k4[0]))
         y_trace.append(y_trace[i] + (1 / 6) * (k1[1] + 2 * k2[1] + 3 * k3[1] + k4[1]))
         z_trace.append(z_trace[i] + (1 / 6) * (k1[2] + 2 * k2[2] + 3 * k3[2] + k4[2]))
+        
+        if np.isnan(x_trace[-1])== True: 
+            break
 
         i = i + 1
 
@@ -979,7 +995,13 @@ def trace_fieldline_v7b(x_start, y_start, z_start, r_hel, di, control_param_path
         if len(np.atleast_1d(usable_indices)) == 0: 
             break
         
-        if x_array[-1] <= -4 * R_M: 
+        r = np.sqrt(x_array[-1]**2 + y_array[-1]**2 + z_array[-1]**2)
+        #print(r)
+        
+        if r < 1.01 * R_M: 
+            break 
+        
+        if x_array[-1] <= -3 * R_M: 
             break
         
 
