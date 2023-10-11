@@ -73,6 +73,7 @@ from numba import jit, njit, prange
 def kth22_model_for_mercury_v8(x_mso, y_mso, z_mso, r_hel, di, control_param_path, fit_param_path, 
                                dipole=True, neutralsheet=True, ringcurrent = True, internal=True,
                                external=True):
+    
 
     
     input_length = x_mso.size
@@ -252,6 +253,9 @@ def kth22_model_for_mercury_v8(x_mso, y_mso, z_mso, r_hel, di, control_param_pat
     
     indices_inside_planet = np.where(r_mso < 0.99*control_params['RPL'])
     
+    if len(indices_inside_planet[0]) == x_msm.size: 
+        return np.array([np.nan, np.nan, np.nan])
+    
     if indices_inside_planet[0].size > 0:  
         print('Warning: ' +  str(indices_inside_planet[0].size) + ' point(s) are located inside the planet.')
       
@@ -267,8 +271,8 @@ def kth22_model_for_mercury_v8(x_mso, y_mso, z_mso, r_hel, di, control_param_pat
 
 
     if usable_indices[0].size == 0:
-        print('No points within the magnetopause! Setting result to zero...')
-        return np.zeros(x_msm.size)
+        print('No points within the magnetosphere! Setting result to zero...')
+        return np.array([np.nan, np.nan, np.nan])
 
     
     elif len([usable_indices[0]]) < n_points:
@@ -897,8 +901,8 @@ def trace_field_line_single_v7b():
     di = 50
     
 
-    fieldlinetrace = trace_fieldline_v7b(x_start, y_start, z_start, r_hel, di, delta_t=0.3)
-    fieldlinetrace = trace_fieldline_v7b(x_start, y_start, z_start, r_hel, di, delta_t=-0.3)
+    fieldlinetrace = trace_fieldline_v8(x_start, y_start, z_start, r_hel, di, delta_t=0.3)
+    fieldlinetrace = trace_fieldline_v8(x_start, y_start, z_start, r_hel, di, delta_t=-0.3)
     #print(fieldlinetrace)
     x = fieldlinetrace[0]   #x
     y = fieldlinetrace[1]   #y
@@ -915,11 +919,15 @@ def trace_field_line_single_v7b():
     ax1.grid()
     ax1.invert_xaxis()
     
-def trace_fieldline_v7b(x_start, y_start, z_start, r_hel, di, control_param_path, fit_param_path, delta_t=0.3):
+def trace_fieldline_v8(x_start, y_start, z_start, r_hel, di, control_param_path, fit_param_path, delta_t=0.9):
     #for opposite direction choose delta_t = -0.3 (or smaller/higher)
 
     R_M = 2440  #Radius of Mercury in km
     r = np.sqrt((x_start / R_M) ** 2 + (y_start / R_M) ** 2 + (z_start / R_M) ** 2)
+    if delta_t > 0: 
+        sign = 1
+    if delta_t < 0: 
+        sign = -1
 
     if r < 1:
         print('Radius of start point is smaller than 1. You start inside the planet! Radius = ', r)
@@ -928,58 +936,88 @@ def trace_fieldline_v7b(x_start, y_start, z_start, r_hel, di, control_param_path
         #print('Radius = ', r)
 
     def f(x, y, z):
-        return kth22_model_for_mercury_v8(x, y, z, r_hel, di, control_param_path, fit_param_path, True, True, False, True, True)
+        return kth22_model_for_mercury_v8(x, y, z, r_hel, di, control_param_path, fit_param_path, True, True, True, True, True)
 
     x_trace = [x_start]
     y_trace = [y_start]
     z_trace = [z_start]
+    mag_B_list = np.array([])
 
     i = 0
 
-    while r > 1 and i < 4000:
+    while r > 1 and i < 1000:
         
         if i%10 == 0: 
             print('i = ', i)
             
         r = np.sqrt((x_trace[i] / R_M) ** 2 + (y_trace[i] / R_M) ** 2 + (z_trace[i] / R_M) ** 2)
-        if r < 1.05:
+        if r < 1.00:
             #print('r < 1RM')
-            break
-        '''
-        if i > 1 and (z_trace[1] > z_start):    #fieldline starts northward
-            if z_trace[i] < 479:                # stop if fieldline crosses mag. equator
-                break
+            break         
         
-        if i > 1 and (z_trace[1] < z_start):    #fieldline starts southward
-            if z_trace[i] > 479:                 # stop if fieldline crosses mag. equator
-                break
-        '''  
+        B = f(x_trace[i], y_trace[i], z_trace[i])   
         
+        mag_B = float(np.sqrt(B[0]**2 + B[1]**2 + B[2]**2))
         
-        B = f(x_trace[i], y_trace[i], z_trace[i])
+        if r > 1.5: 
+            
+            delta_t = 150/mag_B            
+            if delta_t < 0.3: 
+                delta_t = 0.3
+            elif delta_t > 8: 
+                delta_t = 8
+                
+            delta_t = sign * delta_t
+        elif r < 1.5: 
+            delta_t = sign * 0.9
+           
+        if i%10 == 0: 
+            print('delta_t = ', delta_t)
+        
+        #print('Betrag B: ', mag_B) 
+        #print('r = ', r)        
+        
         if np.isnan(B[0]) == True: 
-            break
-        
-
-        k1 = delta_t * B
-        try: 
-            k2 = delta_t * f(x_trace[i] + 0.5 * k1[0], y_trace[i] + 0.5 * k1[1], z_trace[i] + 0.5 + k1[2])
-        except: break
-        
-        try:
-            k3 = delta_t * f(x_trace[i] + 0.5 * k2[0], y_trace[i] + 0.5 * k2[1], z_trace[i] + 0.5 * k2[2])
-        except: break
-        try: 
-            k4 = delta_t * f(x_trace[i] + k3[0], y_trace[i] + k3[1], z_trace[i] + k3[2])
-        except: 
-            break
+            break        
         
         if np.isnan(x_trace[i])== True: 
             break
         
+        k1 = delta_t * B
+        
+        if np.isnan(k1[0])== True: 
+            break
+        
+        try: 
+            k2 = delta_t * f(x_trace[i] + 0.5 * k1[0], y_trace[i] + 0.5 * k1[1], z_trace[i] + 0.5 + k1[2])
+        except: break
+    
+        if np.isnan(k2[0])== True: 
+            break
+        
+        try:
+            k3 = delta_t * f(x_trace[i] + 0.5 * k2[0], y_trace[i] + 0.5 * k2[1], z_trace[i] + 0.5 * k2[2])
+        except: break
+        if np.isnan(k3[0])== True: 
+            break
+    
+        try: 
+            k4 = delta_t * f(x_trace[i] + k3[0], y_trace[i] + k3[1], z_trace[i] + k3[2])
+        except: 
+            break        
+                
+        if np.isnan(k4[0])== True: 
+            break
+        
+        #print('k1: ', k1)
+        #print('k2: ', k2)
+        #print('k3: ', k3)
+        #print('k4: ', k4)
+        
         x_trace.append(x_trace[i] + (1 / 6) * (k1[0] + 2 * k2[0] + 3 * k3[0] + k4[0]))
         y_trace.append(y_trace[i] + (1 / 6) * (k1[1] + 2 * k2[1] + 3 * k3[1] + k4[1]))
         z_trace.append(z_trace[i] + (1 / 6) * (k1[2] + 2 * k2[2] + 3 * k3[2] + k4[2]))
+        mag_B_list = np.append(mag_B_list, mag_B)
         
         if np.isnan(x_trace[-1])== True: 
             break
@@ -989,7 +1027,7 @@ def trace_fieldline_v7b(x_start, y_start, z_start, r_hel, di, control_param_path
         x_array = np.asarray(x_trace)
         y_array = np.asarray(y_trace)
         z_array = np.asarray(z_trace)
-        
+        mag_B_list = np.asarray(mag_B_list)        
         
         usable_indices = np.loadtxt('usable_indices.txt')
         if len(np.atleast_1d(usable_indices)) == 0: 
@@ -998,11 +1036,13 @@ def trace_fieldline_v7b(x_start, y_start, z_start, r_hel, di, control_param_path
         r = np.sqrt(x_array[-1]**2 + y_array[-1]**2 + z_array[-1]**2)
         #print(r)
         
-        if r < 1.01 * R_M: 
+        if r < 1.00 * R_M: 
             break 
         
-        if x_array[-1] <= -3 * R_M: 
-            break
-        
+        if x_array[-1] <= -4 * R_M: 
+            break  
+             
 
     return (np.array([x_array, y_array, z_array]))
+
+
