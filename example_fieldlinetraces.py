@@ -30,7 +30,7 @@ r_hel = np.array([0.39])
 di = np.array([50])
 
 
-fieldline = kth.trace_fieldline_v7b(x_start, y_start, z_start, 
+fieldline = kth.trace_fieldline_v8(x_start, y_start, z_start, 
                                     r_hel, di, control_param_path, fit_param_path, 
                                     delta_t = 0.7)
 
