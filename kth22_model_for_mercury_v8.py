@@ -971,8 +971,8 @@ def trace_fieldline_v8(x_start, y_start, z_start, r_hel, di, control_param_path,
         elif r < 1.5: 
             delta_t = sign * 0.9
            
-        if i%10 == 0: 
-            print('delta_t = ', delta_t)
+        #if i%10 == 0: 
+            #print('delta_t = ', delta_t)
         
         #print('Betrag B: ', mag_B) 
         #print('r = ', r)        
