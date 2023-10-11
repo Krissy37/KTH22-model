@@ -11,10 +11,10 @@ from matplotlib import pyplot as plt, dates as mdates
 from matplotlib.patches import Wedge
 
 import sys
-sys.path.append('C:\\Users\\kriss\\Documents\\Homeoffice\\KTH22-model-main\\KTH22-model-main\\') # adapt this local path!
+sys.path.append(' YOUR PATH ') # adapt this local path!
 import kth22_model_for_mercury_v8 as kth
-control_param_path = 'C:\\Users\\kriss\\Documents\\Homeoffice\\KTH22-model-main\\KTH22-model-main\\control_params_v8b.json'
-fit_param_path = 'C:\\Users\\kriss\\Documents\\Homeoffice\\KTH22-model-main\\KTH22-model-main\\kth_own_cf_fit_parameters_opt_total_March23.dat'
+control_param_path = 'control_params_v8b.json'
+fit_param_path = 'kth_own_cf_fit_parameters_opt_total_March23.dat'
 
 # =============================================================================
 # define contants
