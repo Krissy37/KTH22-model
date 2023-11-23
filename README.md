@@ -23,6 +23,7 @@ Takes into account:
 
 
 Required python packages: numpy, scipy
+
 If you want to change the aberration, change the aberration value in the control parameter file; aberration angle in radiants, not in degrees. 
 
 # Input Parameters:
