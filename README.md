@@ -3,15 +3,15 @@ Model of Mercury's Magnetospheric Magnetic Field (KTH22)
 
 This model calculates the magnetic field inside the Hermean magnetosphere. 
 
-Publication (under review): "Revised Magnetospheric Model Reveals Signatures of1
-Field-Aligned Current Systems at Mercury" 
+Publication: "Revised Magnetospheric Model Reveals Signatures of
+Field-Aligned Current Systems at Mercury" https://doi.org/10.1029/2023JA031529
 
 Description:
 Calculates the magnetospheric field for Mercury. Based on Korth et al., (2015) with  improvements.
 Model is intended for planning purposes of the BepiColombo mission. 
 If you plan to make a publication with the aid of this model, the opportunity to participate as co-author
 would be appreciated. 
-If you have suggestions for improvements, do not hesitate to write me an email.
+If you have suggestions for improvements, do not hesitate to write me an email (k.pump@tu-bs.de). 
      
 Takes into account:
 - internal dipole field (offset dipole)
