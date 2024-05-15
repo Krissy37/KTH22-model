@@ -1,11 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Apr  3 15:48:45 2023
-
-@author: Kristin
-"""
-# -*- coding: utf-8 -*-
-"""
 Created on Tue Dec  6 15:20:38 2022
 
 @author: Kristin
@@ -39,7 +33,8 @@ Created on Tue Dec  6 15:20:38 2022
 #      z_mso: in, required, z-positions (array) in MSO base given in km
 #      r_hel: in, required, heliocentric distance in AU, use values between 0.3 and 0.47  
 #      DI: in, required, disturbance index (0 < DI < 100), if not known:  50 (mean value) 
-#      modules: dipole (internal and external), neutralsheet (internal and external)
+#      (x_mso, y_mso, z_mso, r_hel and DI should be numpy arrays)
+#      modules: dipole (internal and external), neutralsheet (internal and external), ring current(internal)
 #      "external = True" calculates the cf-fields (shielding fields) for each module which is set true
 # 
 # Return: 
@@ -55,7 +50,8 @@ Created on Tue Dec  6 15:20:38 2022
 #   publication: (submitted, under review) "Revised Magnetospheric Model Reveals Signatures of
 #   Field-Aligned Current Systems at Mercury""
 #
-#   latest update: 6th June 2023, speed improvement 
+#   update: 6th June 2023, speed improvement 
+#   update: 15th May 2024, fixed bug in fieldlinetracing
 #
 ###################################################################################################################
 
@@ -63,10 +59,9 @@ import numpy as np
 import json
 import scipy.special as special
 from scipy.integrate import simps
-import mpmath
 import sys 
 import matplotlib.pyplot as plt
-from numba import jit, njit, prange
+from numba import  njit, prange
 
 
 
@@ -74,24 +69,43 @@ def kth22_model_for_mercury_v8(x_mso, y_mso, z_mso, r_hel, di, control_param_pat
                                dipole=True, neutralsheet=True, ringcurrent = True, internal=True,
                                external=True):
     
-
+    if isinstance(x_mso, np.ndarray) == False:
+        print('Error: Coordinate input needs to be a numpy array. Example: x_mso = np.array([2500]).')
+        sys.exit()
+    if isinstance(y_mso, np.ndarray) == False:
+        print('Error: Coordinate input needs to be a numpy array. Example: y_mso = np.array([0]).')
+        sys.exit()
+    if isinstance(z_mso, np.ndarray) == False:
+        print('Error: Coordinate input needs to be a numpy array. Example: z_mso = np.array([0]).')
+        sys.exit()
+        
+    if isinstance(r_hel, float): 
+        #print('Type of r_hel is float. Changing to numpy array. ')
+        r_hel_tmp = np.ones(len(x_mso)) * r_hel
+        r_hel = r_hel_tmp
+        
+    if isinstance(di, float): 
+        #print('Type of di is float. Changing to numpy array. ')
+        di_tmp = np.ones(len(x_mso)) * di
+        di = di_tmp
+        
+    if isinstance(di, int): 
+        #print('Type of di is int. Changing to numpy array. ')
+        di_tmp = np.ones(len(x_mso)) * di
+        di = di_tmp
+       
     
     input_length = x_mso.size
     x_mso = np.array(x_mso).flatten()
     y_mso = np.array(y_mso).flatten()
     z_mso = np.array(z_mso).flatten()
     
-    
-    if type(x_mso) != float :
-        shape = np.array(x_mso.shape) 
-        if shape.size >= 2 : 
-            print('Positions must be float or 1D arrays! Aborting... ')
-            sys.exit()
-            
+           
 
     if x_mso.size != y_mso.size != z_mso.size:
         print('Number of positions (x,y,z) do not match')
         sys.exit()
+
         
     if x_mso.size != r_hel.size:
         print('Length of heliocentric distance (r_hel) does not match. All input array must have the same size.')
@@ -224,9 +238,7 @@ def kth22_model_for_mercury_v8(x_mso, y_mso, z_mso, r_hel, di, control_param_pat
             print('Please use r_hel (heliocentric distance) in AU, not in km.r_hel should be between 0.3 and 0.47.')
             sys.exit()
 
-    R_SS = f * (r_hel ** (1 / 3)) * control_params['RPL']
-
-    
+    R_SS = f * (r_hel ** (1 / 3)) * control_params['RPL']    
 
     control_params['kappa'] = control_params['RMP'] / R_SS
     control_params['kappa3'] = (control_params['kappa']) ** 3
@@ -264,23 +276,21 @@ def kth22_model_for_mercury_v8(x_mso, y_mso, z_mso, r_hel, di, control_param_pat
 
     usable_indices = np.where(r_msm <= r_mp_check)
 
-    np.savetxt('usable_indices.txt', usable_indices)
-
     n_points = x_mso.size
     
 
 
     if usable_indices[0].size == 0:
-        print('No points within the magnetosphere! Setting result to zero...')
+        print('No points within the magnetosphere! Setting result to NaN.')
         return np.array([np.nan, np.nan, np.nan])
 
     
     elif len([usable_indices[0]]) < n_points:
         #restrict to points within magnetopause
         x_msm = x_msm[usable_indices]
-
         y_msm = y_msm[usable_indices]
         z_msm = z_msm[usable_indices]
+        
         control_params['kappa'] = control_params['kappa'][usable_indices]
         control_params['kappa3'] = control_params['kappa3'][usable_indices]
         di = di[usable_indices]        
@@ -297,10 +307,10 @@ def kth22_model_for_mercury_v8(x_mso, y_mso, z_mso, r_hel, di, control_param_pat
     ##############################################################
     # Calculation of the model field
     #############################################################
-    result = model_field_v7b(x_msm, y_msm, z_msm, di, dipole, neutralsheet, ringcurrent, internal, external, control_params, R_SS)
+    result = model_field_v8(x_msm, y_msm, z_msm, di, dipole, neutralsheet, ringcurrent, internal, external, control_params, R_SS)
     
     
-    result_with_nan = np.empty((3, input_length)) * np.nan
+    result_with_nan = np.zeros((3, input_length)) * np.nan
     
 
     
@@ -309,7 +319,7 @@ def kth22_model_for_mercury_v8(x_mso, y_mso, z_mso, r_hel, di, control_param_pat
     result_with_nan[2,usable_indices] = result[2]
     
     
-    indices_inside_planet = np.where(r_mso < 0.99 * control_params['RPL'] )
+    indices_inside_planet = np.where(r_mso < 0.5 * control_params['RPL'] )
     
     result_with_nan[0,indices_inside_planet] = np.empty(indices_inside_planet[0].size) * np.nan
     result_with_nan[1,indices_inside_planet] = np.empty(indices_inside_planet[0].size) * np.nan
@@ -318,17 +328,17 @@ def kth22_model_for_mercury_v8(x_mso, y_mso, z_mso, r_hel, di, control_param_pat
     
     return result_with_nan
 
-def model_field_v7b(x_msm_in, y_msm_in, z_msm_in, di, dipole, neutralsheet, ringcurrent, internal, external, control_params, R_SS):
+def model_field_v8(x_msm_in, y_msm_in, z_msm_in, di, dipole, neutralsheet, ringcurrent, internal, external, control_params, R_SS):
 
     g10_int_ind = control_params['g10_int_ind']
     kappa3      = control_params['kappa3']
     g10_int     = control_params['g10_int']
-    aberration  = control_params['aberration']
-    
-    
+    aberration  = control_params['aberration']   
 
+    #scaling parameters depending on the di
     t_nsc = control_params['t_a'] + control_params['t_b'] * di
-    t_rc = control_params['t_a'] - control_params['t_b'] * di
+    t_rc = 0.51
+
 
     n_points = x_msm_in.size
     # application of the aberration to the coordinates
@@ -356,7 +366,7 @@ def model_field_v7b(x_msm_in, y_msm_in, z_msm_in, di, dipole, neutralsheet, ring
     if dipole:
         if internal:
 
-            B_int = kappa3 * internal_field_v7b(x_msm_k, y_msm_k, z_msm_k, control_params)
+            B_int = kappa3 * internal_field_v8(x_msm_k, y_msm_k, z_msm_k, control_params)
             B_total = B_total + B_int            
             
         if external:   
@@ -365,7 +375,7 @@ def model_field_v7b(x_msm_in, y_msm_in, z_msm_in, di, dipole, neutralsheet, ring
             # The coefficient was based on empirical work. 
             
             induction_scale_fac = -0.0052631579 * (g10_int + g10_int_ind)
-            B_cf_int = kappa3 * induction_scale_fac * cf_field_v7b(x_msm_k, y_msm_k, z_msm_k,
+            B_cf_int = kappa3 * induction_scale_fac * cf_field_v8(x_msm_k, y_msm_k, z_msm_k,
                                                                   control_params['lin_coeff_int'],
                                                                   control_params['p_i_int'], control_params['q_i_int'],
                                                                   control_params['x_shift_int'])
@@ -377,37 +387,31 @@ def model_field_v7b(x_msm_in, y_msm_in, z_msm_in, di, dipole, neutralsheet, ring
         if internal:
             z_offset = 0.   
                 
-            B_tail_ns = tail_field_ns_bs_v7b(x_msm, y_msm, z_msm, z_offset)      
-            B_total = B_total + t_nsc * B_tail_ns            
+            B_tail_ns = tail_field_ns_bs_v8(x_msm, y_msm, z_msm, z_offset)
+            
+            
+            B_total = B_total + (t_nsc * B_tail_ns)
+            
 
         if external:
             
-            '''
-            #add image sheets at twice the asymptotic tail radius with the opposite current direction
-            
-            R_tail_asymptotic = R_SS * 2. / control_params['RPL']
-            
-            z_offset = 2. * R_tail_asymptotic
-            B_image1_ns = -tail_field_ns_bs_v7b(x_msm, y_msm, z_msm, z_offset)
-
-            z_offset = -2. * R_tail_asymptotic
-            B_image2_ns = -tail_field_ns_bs_v7b(x_msm, y_msm, z_msm, z_offset)
-            '''
             
             #calculate the Chapman-Ferraro currents (shielding)
           
-            B_cf_ns = 0.05 * cf_field_v7b(x_msm_k, y_msm_k, z_msm_k, control_params['lin_coeff_disk'],
+            B_cf_ns = 0.05 * cf_field_v8(x_msm_k, y_msm_k, z_msm_k, control_params['lin_coeff_disk'],
                                     control_params['p_i_disk'], control_params['q_i_disk'],
                                     control_params['x_shift_disk'])
             
             #add 
-            B_total = B_total + (t_nsc * B_cf_ns)# + B_image1_ns + B_image2_ns 
+            B_total = B_total + (t_nsc * B_cf_ns)
+
             
     if ringcurrent:
         if internal:            
             
             scale_fac = 5            
-            B_tail_ring = scale_fac * tail_field_ringcurrent_v7b(x_msm_k, y_msm_k, z_msm_k, di, control_params)
+            B_tail_ring = scale_fac * tail_field_ringcurrent_v8(x_msm_k, y_msm_k, z_msm_k, di, control_params)
+            #t_rc = 0.51
             B_total = B_total + t_rc *  B_tail_ring
 
         if external:
@@ -436,7 +440,7 @@ def model_field_v7b(x_msm_in, y_msm_in, z_msm_in, di, dipole, neutralsheet, ring
 
     return np.array([b_x, b_y, b_z])
 
-def cf_field_v7b(x_msm: np.ndarray, y_msm: np.ndarray, z_msm: np.ndarray, lin_coeff: list, p_i, q_i, x_shift):
+def cf_field_v8(x_msm: np.ndarray, y_msm: np.ndarray, z_msm: np.ndarray, lin_coeff: list, p_i, q_i, x_shift):
     # this function calculates the chapman-ferraro-field (schielding field) for the KTH Model
     
     n_vec = x_msm.size
@@ -474,7 +478,7 @@ def cf_field_v7b(x_msm: np.ndarray, y_msm: np.ndarray, z_msm: np.ndarray, lin_co
     return np.array([b_x_cf, b_y_cf, b_z_cf])
 
 
-def internal_field_v7b(x_msm, y_msm, z_msm, control_params):
+def internal_field_v8(x_msm, y_msm, z_msm, control_params):
 
     # this calculates the magnetic field of an internal axisymmetric
     # dipole in a standard spherical harmonic expansion. The field
@@ -542,12 +546,12 @@ def internal_field_v7b(x_msm, y_msm, z_msm, control_params):
 
 
         
-def a_phi_hankel_v7b(H_current, rho_z_in, phi, z, lambda_arr, d_0, delta_x, scale_x_d, delta_y):
+def a_phi_hankel_v8(H_current, rho_z_in, phi, z, lambda_arr, d_0):
     # This function calculates the vector potential a_phi with the results from the Hankel transformation of
     # the neutral sheet current.
 
 
-    sheet_thickness = 0.1
+    sheet_thickness = d_0
     
     integrand = H_current * special.j1(lambda_arr * rho_z_in) * np.exp( -lambda_arr * np.sqrt(z ** 2 + sheet_thickness ** 2))
   
@@ -573,7 +577,7 @@ def fx(xj):
 
 
 
-def tail_field_ns_bs_v7b(x_target,y_target,z_target, z_offset):
+def tail_field_ns_bs_v8(x_target,y_target,z_target, z_offset):
     
     
     mu = 4e-7 * np.pi 
@@ -639,7 +643,7 @@ def tail_field_ns_bs_v7b(x_target,y_target,z_target, z_offset):
             Bx_arr[i_vec] = Bx 
             Bz_arr[i_vec] = Bz
             
-        return Bx_arr, By_arr, Bz_arr    
+        return np.array([Bx_arr, By_arr, Bz_arr])    
     
     def tail_field_fast_sum_single():   
         Bx_arr = np.zeros(n_vec)
@@ -669,7 +673,7 @@ def tail_field_ns_bs_v7b(x_target,y_target,z_target, z_offset):
             Bx_arr[i_vec] = Bx 
             Bz_arr[i_vec] = Bz
             
-        return Bx_arr, By_arr, Bz_arr
+        return np.array([Bx_arr, By_arr, Bz_arr]) 
         
        
     # decision wether single or multi processing is used to make the model faster.
@@ -690,17 +694,16 @@ def tail_field_ns_bs_v7b(x_target,y_target,z_target, z_offset):
     return output_tail_field 
 
 
-def tail_field_ringcurrent_v7b(x_msm, y_msm, z_msm, di, control_params):
+def tail_field_ringcurrent_v8(x_msm, y_msm, z_msm, di, control_params):
 
     rho = np.sqrt(x_msm ** 2 + y_msm ** 2)
     phi = np.arctan2(y_msm, x_msm)
 
-    d_0 = control_params['d_0']
-    delta_x = control_params['delta_x']
-    scale_x_d = control_params['scale_x_d']
-    delta_y = control_params['delta_y']
+    d_0 = control_params['d_0']  #sheet thickness
 
-    t = control_params['t_a'] + control_params['t_b'] * di
+
+    #t = control_params['t_a'] + control_params['t_b'] * di
+    
 
     mu_0 = 1.0
     steps = 100
@@ -710,7 +713,7 @@ def tail_field_ringcurrent_v7b(x_msm, y_msm, z_msm, di, control_params):
 
     rho_hankel = np.arange(steps) / float(steps-1.) * (rho_max - rho_min) + rho_min
 
-    current = current_profile_ringcurrent_v7b(rho_hankel, control_params)
+    current = current_profile_ringcurrent_v8(rho_hankel, control_params)
 
     
     lambda_max = 20  # std value
@@ -743,65 +746,69 @@ def tail_field_ringcurrent_v7b(x_msm, y_msm, z_msm, di, control_params):
 
   
     for i in range(n_vec):
-        a_phi = a_phi_hankel_v7b(H_current, rho[i], phi[i], z_msm[i], lambda_out, d_0, delta_x,
-                               scale_x_d, delta_y)
+        a_phi = a_phi_hankel_v8(H_current, rho[i], phi[i], z_msm[i], lambda_out, d_0)
 
         # numerically approximate the derivatives
         delta_z = 10 ** (-5)
 
-        d_a_phi_d_z = (a_phi_hankel_v7b(H_current, rho[i], phi[i], z_msm[i] + delta_z, lambda_out, d_0,
-                                      delta_x, scale_x_d,
-                                      delta_y) - a_phi_hankel_v7b(H_current, rho[i],
-                                                                    phi[i],
-                                                                    z_msm[i] - delta_z,
-                                                                    lambda_out,
-                                                                    d_0, delta_x,
-                                                                    scale_x_d,
-                                                                    delta_y)) / (
-                          2 * delta_z)
+        d_a_phi_d_z = (a_phi_hankel_v8(H_current, rho[i], phi[i], z_msm[i] + delta_z, lambda_out, d_0) 
+                       - a_phi_hankel_v8(H_current, rho[i],  phi[i], z_msm[i] - delta_z, lambda_out, d_0)) / ( 2 * delta_z)
 
+        #delta_rho = 10 ** (-5)
         delta_rho = 10 ** (-5)
-        d_a_phi_d_rho = (a_phi_hankel_v7b(H_current, rho[i] + delta_rho, phi[i], z_msm[i], lambda_out,
-                                        d_0, delta_x,
-                                        scale_x_d, delta_y) - a_phi_hankel_v7b(
-            H_current, rho[i] - delta_rho, phi[i],
-            z_msm[i], lambda_out, d_0, delta_x, scale_x_d,
-            delta_y)) / (2 * delta_rho)
+        d_a_phi_d_rho = (a_phi_hankel_v8(H_current, rho[i] + delta_rho, phi[i], z_msm[i], lambda_out,
+                                        d_0) - a_phi_hankel_v8(
+            H_current, rho[i] - delta_rho, phi[i], z_msm[i], lambda_out, d_0)) / (2 * delta_rho)
 
 
-        b_tail_disk_rho[i] = t[i] * (- d_a_phi_d_z)
+        b_tail_disk_rho[i] =  (- d_a_phi_d_z)
         
         
         
 
         if rho[i] <= 10 ** (-4):
-            b_tail_disk_z[i] = t[i] * (1.0 + d_a_phi_d_rho)
+            b_tail_disk_z[i] =  (1.0 + d_a_phi_d_rho)
 
         else:
-            b_tail_disk_z[i] = t[i] * (a_phi / rho[i] + d_a_phi_d_rho)
+            #b_tail_disk_z[i] =  (a_phi / rho[i] + d_a_phi_d_rho)
+            b_tail_disk_z[i] =  (a_phi / rho[i] - d_a_phi_d_rho)
 
         # rotate back to cartesian
         b_tail_disk_x[i] = b_tail_disk_rho[i] * np.cos(phi[i])
         b_tail_disk_y[i] = b_tail_disk_rho[i] * np.sin(phi[i])
 
-    z_sheet_thickness =   1 * np.exp(-0.5*((z_msm)/2)**2 )
+    #z_sheet_thickness =   1 * np.exp(-0.5*((z_msm)/2)**2 )
+    z_sheet_thickness = 1
     # rho_sheet_thickness =  1 * np.exp(-0.5*((rho-1)/2)**2 )
+    d_test = 0.48
+    e_test = -1.1
+    f_test = 1.2
+
+    #sheet_thickness_in_x = (d_test/f_test*np.sqrt(2*np.pi)) * np.exp(-(x_msm-e_test)**2/(2*f_test**2))
     
+    sheet_thickness_in_x = 1
+
     
-    b_tail_disk_z = b_tail_disk_z * z_sheet_thickness 
-    b_tail_disk_x = b_tail_disk_x * z_sheet_thickness 
-    b_tail_disk_y = b_tail_disk_y * z_sheet_thickness
+    b_tail_disk_z = b_tail_disk_z * sheet_thickness_in_x * z_sheet_thickness 
+    b_tail_disk_x = b_tail_disk_x * sheet_thickness_in_x * z_sheet_thickness 
+    b_tail_disk_y = b_tail_disk_y * sheet_thickness_in_x * z_sheet_thickness
     
 
 
     return np.array([b_tail_disk_x, b_tail_disk_y, b_tail_disk_z])
 
-def current_profile_ringcurrent_v7b(rho, control_params):
+def current_profile_ringcurrent_v8(rho, control_params):
     #this function calculates the current profile of the ring current
     
     d = control_params['d']
     e = control_params['e']
     f = control_params['f']
+    
+    
+    
+    #print('d = ', d)
+    #print('e = ', e)
+    #print('f = ', f)
     
     
     current = -(d/f*np.sqrt(2*np.pi)) * np.exp(-(rho-e)**2/(2*f**2))
@@ -833,7 +840,7 @@ def shue_mp_calc_r_mp(x, y, z, RMP, alpha):
 	
 
 
-def mp_normal_v7b(x_msm, y_msm, z_msm, RMP, alpha):
+def mp_normal_v8(x_msm, y_msm, z_msm, RMP, alpha):
     """
 	This function calculates the normal vector at the magnetopause.
 	
@@ -890,7 +897,7 @@ def mp_normal_v7b(x_msm, y_msm, z_msm, RMP, alpha):
 
     return mp_normal_x, mp_normal_y, mp_normal_z
 
-def trace_field_line_single_v7b():
+def trace_field_line_single_v8():
     mercury1 = plt.Circle((0, (479/2440)), 1, color = '0.75')
 
     R_M = 2440.
@@ -921,7 +928,11 @@ def trace_field_line_single_v7b():
     
 def trace_fieldline_v8(x_start, y_start, z_start, r_hel, di, control_param_path, fit_param_path, delta_t=0.9):
     #for opposite direction choose delta_t = -0.3 (or smaller/higher)
-
+    
+    if (len(x_start) * len(y_start) * len(z_start)) != 1: 
+        print('Please enter only one starting position for the fieldline')
+        return np.nan
+    
     R_M = 2440  #Radius of Mercury in km
     r = np.sqrt((x_start / R_M) ** 2 + (y_start / R_M) ** 2 + (z_start / R_M) ** 2)
     if delta_t > 0: 
@@ -931,9 +942,11 @@ def trace_fieldline_v8(x_start, y_start, z_start, r_hel, di, control_param_path,
 
     if r < 1:
         print('Radius of start point is smaller than 1. You start inside the planet! Radius = ', r)
-        sys.exit()
-    #else:
-        #print('Radius = ', r)
+        return np.nan
+    if x_start > 1.8 * R_M: 
+        print('Your start point is outside the magnetosphere. Please choose a startposition closer to the planet. ')
+        return np.nan
+
 
     def f(x, y, z):
         return kth22_model_for_mercury_v8(x, y, z, r_hel, di, control_param_path, fit_param_path, True, True, True, True, True)
@@ -942,8 +955,14 @@ def trace_fieldline_v8(x_start, y_start, z_start, r_hel, di, control_param_path,
     y_trace = [y_start]
     z_trace = [z_start]
     mag_B_list = np.array([])
+    
+    x_array = np.asarray(x_trace)
+    y_array = np.asarray(y_trace)
+    z_array = np.asarray(z_trace)
+    mag_B_list = np.asarray(mag_B_list)
 
     i = 0
+    
 
     while r > 1 and i < 1000:
         
@@ -986,27 +1005,37 @@ def trace_fieldline_v8(x_start, y_start, z_start, r_hel, di, control_param_path,
         k1 = delta_t * B
         
         if np.isnan(k1[0])== True: 
+            #print('k1 is nan')
             break
         
         try: 
             k2 = delta_t * f(x_trace[i] + 0.5 * k1[0], y_trace[i] + 0.5 * k1[1], z_trace[i] + 0.5 + k1[2])
-        except: break
+        except: 
+            #print('k2 is nan')
+            break
     
         if np.isnan(k2[0])== True: 
             break
-        
+       
         try:
             k3 = delta_t * f(x_trace[i] + 0.5 * k2[0], y_trace[i] + 0.5 * k2[1], z_trace[i] + 0.5 * k2[2])
-        except: break
+        except: 
+            #print('k3 is nan')
+            break
         if np.isnan(k3[0])== True: 
+            #print('k3 is nan')
             break
     
+        
+        
         try: 
             k4 = delta_t * f(x_trace[i] + k3[0], y_trace[i] + k3[1], z_trace[i] + k3[2])
         except: 
+            #print('k4 is nan')
             break        
                 
         if np.isnan(k4[0])== True: 
+            #print('k4 is nan')
             break
         
         #print('k1: ', k1)
@@ -1014,12 +1043,14 @@ def trace_fieldline_v8(x_start, y_start, z_start, r_hel, di, control_param_path,
         #print('k3: ', k3)
         #print('k4: ', k4)
         
+        
         x_trace.append(x_trace[i] + (1 / 6) * (k1[0] + 2 * k2[0] + 3 * k3[0] + k4[0]))
         y_trace.append(y_trace[i] + (1 / 6) * (k1[1] + 2 * k2[1] + 3 * k3[1] + k4[1]))
         z_trace.append(z_trace[i] + (1 / 6) * (k1[2] + 2 * k2[2] + 3 * k3[2] + k4[2]))
         mag_B_list = np.append(mag_B_list, mag_B)
         
         if np.isnan(x_trace[-1])== True: 
+            #print('last element is nan')
             break
 
         i = i + 1
@@ -1027,11 +1058,9 @@ def trace_fieldline_v8(x_start, y_start, z_start, r_hel, di, control_param_path,
         x_array = np.asarray(x_trace)
         y_array = np.asarray(y_trace)
         z_array = np.asarray(z_trace)
-        mag_B_list = np.asarray(mag_B_list)        
+        mag_B_list = np.asarray(mag_B_list)  
         
-        usable_indices = np.loadtxt('usable_indices.txt')
-        if len(np.atleast_1d(usable_indices)) == 0: 
-            break
+        
         
         r = np.sqrt(x_array[-1]**2 + y_array[-1]**2 + z_array[-1]**2)
         #print(r)
@@ -1039,9 +1068,9 @@ def trace_fieldline_v8(x_start, y_start, z_start, r_hel, di, control_param_path,
         if r < 1.00 * R_M: 
             break 
         
-        if x_array[-1] <= -4 * R_M: 
+        if x_array[-1] <= -3 * R_M: 
             break  
-             
+        
 
     return (np.array([x_array, y_array, z_array]))
 
