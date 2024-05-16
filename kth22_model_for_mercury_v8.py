@@ -10,16 +10,16 @@ Created on Tue Dec  6 15:20:38 2022
 ###################################################################################################################
 
 # Description:
-#      Calculates the magnetospheric field for Mercury. Based on Korth et al., (2015) with  improvements.
-#      Model is intended for planning purposes of the BepiColombo mission. Keep the model within the team. 
+#      Calculates the magnetospheric magnetic field for Mercury. Based on Korth et al., (2015) with  improvements.
+#      Model is intended for planning purposes of the BepiColombo mission. 
 #      If you plan to make a publication with the aid of this model, the opportunity to participate as co-author
 #      would be appreciated. 
-#      If you have suggestions for improvements, do not hesitate to write me an email.
+#      If you have suggestions for improvements, do not hesitate to write me an email (k.pump@tu-bs.de).
 #      
 #      Takes into account:
 #        - internal dipole field (offset dipole)
 #        - field from neutral sheet current
-#        - field from eastwart ring current
+#        - field from eastward ring current
 #        - respective shielding fields from magnetopause currents
 #        - aberration effect due to orbital motion of Mercury
 #        - scaling with heliocentric distance
@@ -969,10 +969,10 @@ def trace_fieldline_v8(x_start, y_start, z_start, r_hel, di, control_param_path,
 
         i = i + 1
 
-        x_array = np.asarray(x_trace)
-        y_array = np.asarray(y_trace)
-        z_array = np.asarray(z_trace)
-        mag_B_list = np.asarray(mag_B_list)          
+        x_array = np.asarray(x_trace, dtype=object)
+        y_array = np.asarray(y_trace, dtype=object)
+        z_array = np.asarray(z_trace, dtype=object)
+        mag_B_list = np.asarray(mag_B_list, dtype=object)          
         
         
         r = np.sqrt(x_array[-1]**2 + y_array[-1]**2 + z_array[-1]**2)
