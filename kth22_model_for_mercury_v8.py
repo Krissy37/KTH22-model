@@ -975,7 +975,7 @@ def trace_fieldline_v8(x_start, y_start, z_start, r_hel, di, control_param_path,
         mag_B_list = np.asarray(mag_B_list, dtype=object)          
         
         
-        r = np.sqrt(x_array[-1]**2 + y_array[-1]**2 + z_array[-1]**2)
+        r = np.sqrt(x_array[-1].astype(float)**2 + y_array[-1].astype(float)**2 + z_array[-1].astype(float)**2)
         #print(r)
         
         if r < 1.00 * R_M: 
