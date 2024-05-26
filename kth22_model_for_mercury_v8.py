@@ -623,7 +623,7 @@ def tail_field_ns_bs_v8(x_target,y_target,z_target, z_offset):
             Bx_arr[i_vec] = Bx 
             Bz_arr[i_vec] = Bz
             
-        return np.array([Bx_arr, By_arr, Bz_arr])    
+        return Bx_arr, By_arr, Bz_arr    
     
     def tail_field_fast_sum_single():   
         Bx_arr = np.zeros(n_vec)
