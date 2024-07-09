@@ -435,7 +435,7 @@ def model_field_v8(x_msm_in, y_msm_in, z_msm_in, di, dipole, neutralsheet, ringc
         by = B_total[1, :]
         bz = B_total[2, :]
 
-    b_x = bx * np.cos(aberration) - by * np.sin(aberration)
+    b_x = bx * np.cos(aberration) + by * np.sin(aberration)
     b_y = bx * np.sin(aberration) + by * np.cos(aberration)
     b_z = bz
 
