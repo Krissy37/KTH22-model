@@ -29,10 +29,14 @@ z_start = np.array([-0.5])*R_M
 r_hel = np.array([0.39])
 di = np.array([50])
 
+delta_t = 0.7 #step size for Runge Kutta Algorithm. Will be changed in the model 
+              #automatically, depending on the magnetic field strength for speed 
+              #improvement. 
+
 
 fieldline = kth.trace_fieldline_v8(x_start, y_start, z_start, 
                                     r_hel, di, control_param_path, fit_param_path, 
-                                    delta_t = 0.7)
+                                    delta_t = delta_t)
 
 #print('footpoint /end of calculated fieldline: )
 #print('x_mso: ', (fieldline[0])[-1] )
