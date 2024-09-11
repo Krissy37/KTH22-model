@@ -44,6 +44,6 @@ Fieldlinetracing (input: position of start coordinates, heliocentric distance, d
 delta_t controls the step size of the Runge Kutta Algorith. Further description in example_fieldlinetraces.py
     
       
-Authors:
+# Authors and Contact Information:
 Daniel Heyner, Institute for Geophysics and extraterrestrial Physics, Braunschweig, Germany, d.heyner@tu-bs.de
 Kristin Pump, Institute for Geophysics and extraterrestrial Physics, Braunschweig, Germany, k.pump@tu-bs.de
