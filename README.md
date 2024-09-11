@@ -38,6 +38,10 @@ modules: dipole (internal and external), neutralsheet (internal and external)
 # Return: 
  Bx, By, Bz in nT for each coordinate given (x_mso, y_mso, z_mso)
 (if outside of MP or inside Mercury, the KTH-model will return 'nan')
+
+# Additional Functions: 
+Fieldlinetracing (input: position of start coordinates, heliocentric distance, disturbance index and delta_t) 
+delta_t controls the step size of the Runge Kutta Algorith. Further description in example_fieldlinetraces.py
     
       
 Authors:
